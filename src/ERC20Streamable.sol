@@ -47,6 +47,11 @@ contract ERC20Streamable is ERC20 {
         if (units_ > 0) S.timeStartEnd[1] = block.timestamp + units_;
 
         userStreams[msg.sender].push(S);
+        userStreams[to_].push(S);
+
+        /// settle?
+
+        return storedBalanceOf[msg.sender];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -67,10 +72,28 @@ contract ERC20Streamable is ERC20 {
         return true;
     }
 
-    function balanceOf(address who_) public returns (uint256) {
-        return 5;
+    function balanceOf(address who_) public view returns (uint256 balance) {
         /// try magic
+        Stream[] memory US = userStreams[who_];
+        uint256 i;
+        balance = storedBalanceOf[who_];
+        for (i; i < US.length;) {
+            uint256 amt;
+            amt = US[i].timeStartEnd[1] <= block.timestamp
+                ? US[i].timeStartEnd[1] - US[i].timeStartEnd[0]
+                : block.timestamp - US[i].timeStartEnd[0];
+            amt *= US[i].perSec;
+            if (balance < amt) amt += balance;
+            /// @dev
+
+            balance = US[i].from == who_ ? balance - amt : balance + amt;
+            unchecked {
+                ++i;
+            }
+        }
     }
+
+    function calculateElapsedWei() private returns (uint256) {}
 
     function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
@@ -128,6 +151,10 @@ contract ERC20Streamable is ERC20 {
     /*//////////////////////////////////////////////////////////////
                                View
     //////////////////////////////////////////////////////////////*/
+
+    function getUserStreams(address user_) public view returns (Stream[] memory) {
+        return userStreams[user_];
+    }
 
     /*//////////////////////////////////////////////////////////////
                                Misc
