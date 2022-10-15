@@ -64,5 +64,26 @@ contract ERC20StreamableInitTest is Test {
         assertTrue(ERC20S.balanceOf(deployer) == startBalance - amtPerSec * 10, "invalid balance after 1 sec | 2.44");
 
         console.log("######----- test prove Stream -----#######");
+        vm.prank(beneficiary1);
+        vm.expectRevert("Insufficient Balance");
+        ERC20S.startStream(beneficiary1, amtPerSec, 10);
+        skip(22);
+        assertTrue(ERC20S.balanceOf(beneficiary1) == amtPerSec * 10, "invalid balance after 1 sec | 1.44");
+        assertTrue(ERC20S.balanceOf(deployer) == startBalance - amtPerSec * 10, "invalid balance after 1 sec | 2.44");
+
+        vm.prank(deployer);
+        ERC20S.transfer(beneficiary1, 10 ether);
+        vm.prank(beneficiary1);
+        ERC20S.startStream(beneficiary1, amtPerSec, 10);
+        skip(1);
+
+        vm.prank(beneficiary1);
+        ERC20S.startStream(beneficiary2, amtPerSec, 10);
+        skip(1);
+        uint256 balance1 = ERC20S.balanceOf(beneficiary2);
+        assertTrue(balance1 > 0);
+        skip(1);
+        assertTrue(ERC20S.balanceOf(beneficiary2) == balance1 * 2);
+        // assertTrue(ERC20S.balanceOf(beneficiary2) == 20);
     }
 }

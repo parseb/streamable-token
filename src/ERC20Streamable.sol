@@ -34,12 +34,16 @@ contract ERC20Streamable is ERC20 {
                                Events
     //////////////////////////////////////////////////////////////*/
     event functionSuspended(bytes4 fxSelect, bool afterFlipState);
+    event StreamStarted(address from, address to, uint256 amountPerSec, uint256 howManyOf);
 
     /*//////////////////////////////////////////////////////////////
                                Public Stream
     //////////////////////////////////////////////////////////////*/
 
     function startStream(address to_, uint256 amtPerSec_, uint256 units_) public returns (uint256 startBalance) {
+        startBalance = storedBalanceOf[msg.sender];
+        require(storedBalanceOf[msg.sender] > amtPerSec_, "Insufficient Balance");
+
         Stream memory S;
         S.from = msg.sender;
         S.perSec = amtPerSec_;
@@ -49,17 +53,25 @@ contract ERC20Streamable is ERC20 {
         userStreams[msg.sender].push(S);
         userStreams[to_].push(S);
 
-        /// settle?
-
-        return storedBalanceOf[msg.sender];
+        /// settle ?
+        emit StreamStarted(msg.sender, to_, amtPerSec_, units_);
     }
 
+    /// @notice settles streams and converts eligible balances to storedBalance type
+
+    function settle(address who_) public returns (uint256 settledBalance) {
+        /// recursive settle stream up to present block
+
+        /// remove obsolete streams
+    }
     /*//////////////////////////////////////////////////////////////
                                Public Override
     //////////////////////////////////////////////////////////////*/
 
     function transfer(address to, uint256 amount) public virtual override returns (bool) {
         storedBalanceOf[msg.sender] -= amount;
+
+        /// settle
 
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
@@ -73,7 +85,6 @@ contract ERC20Streamable is ERC20 {
     }
 
     function balanceOf(address who_) public view returns (uint256 balance) {
-        /// try magic
         Stream[] memory US = userStreams[who_];
         uint256 i;
         balance = storedBalanceOf[who_];
@@ -83,8 +94,7 @@ contract ERC20Streamable is ERC20 {
                 ? US[i].timeStartEnd[1] - US[i].timeStartEnd[0]
                 : block.timestamp - US[i].timeStartEnd[0];
             amt *= US[i].perSec;
-            if (balance < amt) amt += balance;
-            /// @dev
+            // if (balance < amt) amt = balance; /// @dev
 
             balance = US[i].from == who_ ? balance - amt : balance + amt;
             unchecked {
@@ -97,6 +107,8 @@ contract ERC20Streamable is ERC20 {
 
     function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
+
+        /// settle
 
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
 
@@ -114,6 +126,7 @@ contract ERC20Streamable is ERC20 {
     }
 
     function approve(address spender, uint256 amount) public override returns (bool) {
+        /// settle
         allowance[msg.sender][spender] = amount;
 
         emit Approval(msg.sender, spender, amount);
@@ -138,6 +151,8 @@ contract ERC20Streamable is ERC20 {
 
     function _burn(address from, uint256 amount) internal virtual override {
         storedBalanceOf[from] -= amount;
+
+        // settle
 
         // Cannot underflow because a user's balance
         // will never be larger than the total supply.
